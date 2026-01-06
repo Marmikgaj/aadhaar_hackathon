@@ -97,17 +97,51 @@ The project includes combined CSV files ready for analysis. If you need to re-me
 | Demographic | 2,071,700 | 5 chunks     |
 | Enrolment   | 1,006,029 | 3 chunks     |
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 👥 Authors
 
-- Marmik Gajbhiye
+<!-- - Marmik Gajbhiye
+ -->
+<a href="https://github.com/Marmikgaj">
+    <img src="https://github.com/Marmikgaj.png" width="100px;"  style="border-radius:50%;" alt="Marmik Gajbhiye"/><br/>
+    <sub><b>Marmik Gajbhiye</b></sub>
+</a>
+
+## 🤝 Contributor <!--List -->
+
+<div align="left">
+  <table>
+    <tr>
+      <td align="center">   
+        <a href="https://github.com/theanant404">
+          <img src="https://github.com/theanant404.png" width="100px;" style="border-radius:50%;" alt="Anant Kumar"/><br/>
+          <sub><b>Anant Kumar</b></sub>
+        </a>
+      </td>
+            <td align="center">   
+        <a href="https://github.com/NickyY28">
+          <img src="https://github.com/NickyY28.png" width="100px;" style="border-radius:50%;" alt="Nicky Yadav"/><br/>
+          <sub><b>Nicky Yadav</b></sub>
+        </a>
+      </td>
+            <td align="center">   
+        <a href="https://github.com/TheCodeLord-INX">
+          <img src="https://github.com/TheCodeLord-INX.png" width="100px;" style="border-radius:50%;" alt="Aditya Vaidhya IITM"/><br/>
+          <sub><b>Aditya Vaidhya</b></sub>
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://github.com/as-ga">
+          <img src="https://github.com/as-ga.png" width="100px;"  style="border-radius:50%;" alt="Ashutosh Gaurav"/><br/>
+          <sub><b>Ashutosh Gaurav</b></sub>
+        </a>
+      </td>
+      </tr>
+  </table>
+</div>
 
 ## 🙏 Acknowledgments
 
