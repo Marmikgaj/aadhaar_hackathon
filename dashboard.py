@@ -3,6 +3,8 @@ from src.loader import load_data, get_state_list, get_district_list
 from src.plots import plot_trend, plot_bar_distribution
 import plotly.express as px
 import pandas as pd
+from ydata_profiling import ProfileReport
+import streamlit.components.v1 as components
 
 # Page config
 st.set_page_config(
@@ -19,13 +21,15 @@ if data is None:
     st.error("Failed to load data. Please check raw files.")
     st.stop()
 
+
+
 enrolment_df = data['enrolment']
 demographic_df = data['demographic']
 biometric_df = data['biometric']
 
 # Sidebar
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Overview", "Enrolment Analysis", "Demographic Updates", "Biometric Updates", "Visual Analysis", "Demand Forecasting", "MBU Compliance Tracker"])
+page = st.sidebar.radio("Go to", ["Overview", "Enrolment Analysis", "Demographic Updates", "Biometric Updates", "Visual Analysis", "Demand Forecasting", "MBU Compliance Tracker", "Automated Profiling"])
 
 st.sidebar.header("Global Filters")
 # State Filter
@@ -590,4 +594,30 @@ elif page == "MBU Compliance Tracker":
             'Child Bio Updates': '{:,.0f}',
             'Compliance Score': '{:.2%}'
         }))
+
+
+elif page == "Automated Profiling":
+    st.title("Automated Data Profiling")
+    st.markdown("### Generate Comprehensive Data Quality Reports")
+    
+    dataset_option = st.selectbox("Select Dataset to Profile", ["Enrolment Data", "Demographic Data", "Biometric Data"])
+    
+    if dataset_option == "Enrolment Data":
+        target_df = enrolment_df
+    elif dataset_option == "Demographic Data":
+        target_df = demographic_df
+    else:
+        target_df = biometric_df
+        
+    st.warning("⚠️ **Note**: Generating a profile report can take a few minutes depending on dataset size.")
+    
+    if st.button("Generate Profiling Report"):
+        with st.spinner(f"Generating report for {dataset_option}..."):
+            try:
+                # Use a minimal configuration if data is large, or default
+                pr = ProfileReport(target_df, title=f"{dataset_option} Profiling Report", minimal=True)
+                # Display using components.html
+                components.html(pr.to_html(), height=1000, scrolling=True)
+            except Exception as e:
+                st.error(f"Error generating report: {e}")
 
