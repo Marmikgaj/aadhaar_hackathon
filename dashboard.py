@@ -29,7 +29,7 @@ biometric_df = data['biometric']
 
 # Sidebar
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Overview", "Enrolment Analysis", "Demographic Updates", "Biometric Updates", "Visual Analysis", "Demand Forecasting", "MBU Compliance Tracker", "Automated Profiling"])
+page = st.sidebar.radio("Go to", ["Overview", "Enrolment Analysis", "Demographic Updates", "Biometric Updates", "Visual Analysis", "Demand Forecasting", "MBU Compliance Tracker", "Migration & Anomalies", "Automated Profiling"])
 
 st.sidebar.header("Global Filters")
 # State Filter
@@ -596,6 +596,7 @@ elif page == "MBU Compliance Tracker":
         }))
 
 
+
 elif page == "Automated Profiling":
     st.title("Automated Data Profiling")
     st.markdown("### Generate Comprehensive Data Quality Reports")
@@ -620,4 +621,141 @@ elif page == "Automated Profiling":
                 components.html(pr.to_html(), height=1000, scrolling=True)
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
+elif page == "Migration & Anomalies":
+    st.title("🛡️ Illegal Migration & Anomaly Detection")
+    st.markdown("### 🕵️ Data Forensics: Detecting Anomalous Enrollment Patterns")
+    st.info("This module uses heuristic analysis to identify districts with **disproportionate adult enrollments** and **sudden surges**, which can be proxies for undocumented migration or fraudulent bulk enrollments.")
+
+    # --- 1. Metric Calculation Engine ---
+    with st.spinner("Running Anomaly Detection Algorithms..."):
+        # Working with Enrolment Data
+        # Filter by State if detected
+        working_df = enrolment_df.copy()
+        if selected_state != "All":
+            working_df = working_df[working_df['state'] == selected_state]
+
+        # A. Aggregate at District Level (Total Volume)
+        district_stats = working_df.groupby('district')[['age_0_5', 'age_5_17', 'age_18_greater']].sum().reset_index()
+        
+        # B. Calculate Risk Indicators
+        # Indicator 1: Adult Influx Index (AII)
+        # Logic: Natural growth usually has a balanced age pyramid. Migration is often adult-heavy.
+        # Formula: Adult Enrolments / (Child Enrolments + 1) -> Avoid div by zero
+        district_stats['Total_Enrolments'] = district_stats['age_0_5'] + district_stats['age_5_17'] + district_stats['age_18_greater']
+        district_stats['Child_Enrolments'] = district_stats['age_0_5'] + district_stats['age_5_17']
+        
+        # Scaling AII: High adult ratio is suspicious
+        district_stats['Adult_Influx_Index'] = district_stats['age_18_greater'] / (district_stats['Child_Enrolments'] + 1)
+
+        # Indicator 2: Volume Surge (Velocity)
+        # We need time-series data for this. Let's look at the last 7 days vs previous 30 days avg (Proxy)
+        # For this high-level view, we'll use Total Volume as a simple proxy for 'Magnitude' of the issue
+        # To get a real "Surge", we would need to calculate daily change per district.
+        # Let's do a simplified "Recent Intensity" if date is available, else use Total Density.
+        
+        # Advanced: Calculate Daily Velocity per District
+        # Group by District and Date
+        daily_vol = working_df.groupby(['district', 'date'])[['age_0_5', 'age_5_17', 'age_18_greater']].sum().sum(axis=1).reset_index(name='Daily_Vol')
+        
+        # Calculate trailing 7-day average per district
+        # (This is expensive on large data, so we'll do a simplified "Peak Day" metric)
+        peak_surge = daily_vol.groupby('district')['Daily_Vol'].max().reset_index(name='Peak_Daily_Surge')
+        
+        # Merge metrics
+        risk_df = pd.merge(district_stats, peak_surge, on='district')
+        
+        # Calculate Final Risk Score (Normalized)
+        # Normalize AII
+        aii_max = risk_df['Adult_Influx_Index'].max()
+        risk_df['Prop_Adult_Score'] = risk_df['Adult_Influx_Index'] / aii_max
+        
+        # Normalize Peak Surge (Log scale due to variance)
+        import numpy as np
+        risk_df['Vol_Score'] = np.log1p(risk_df['Peak_Daily_Surge']) / np.log1p(risk_df['Peak_Daily_Surge'].max())
+        
+        # Composite Risk Score: 70% Weight on Adult Ratio (Nature of migration), 30% Volume
+        risk_df['Risk_Score'] = (0.7 * risk_df['Prop_Adult_Score']) + (0.3 * risk_df['Vol_Score'])
+        
+        # Filter out low-data noise (districts with very few enrolments)
+        risk_df = risk_df[risk_df['Total_Enrolments'] > 50].sort_values(by='Risk_Score', ascending=False)
+    
+    # --- 2. Dashboard Layout ---
+    
+    # KPI Row
+    col1, col2, col3, col4 = st.columns(4)
+    highest_risk_dist = risk_df.iloc[0]['district']
+    highest_risk_score = risk_df.iloc[0]['Risk_Score']
+    avg_adult_ratio = risk_df['Adult_Influx_Index'].mean()
+    
+    col1.metric("Highest Risk District", highest_risk_dist, help="District with highest combined anomaly score")
+    col2.metric("Max Adult/Child Ratio", f"{risk_df['Adult_Influx_Index'].max():.2f}", help="Highest ratio of Adult vs Child enrolments found")
+    col3.metric("Avg Adult/Child Ratio", f"{avg_adult_ratio:.2f}", delta=f"{((risk_df.iloc[0]['Adult_Influx_Index'] - avg_adult_ratio)/avg_adult_ratio)*100:.0f}% vs Avg")
+    col4.metric("Districts Flagged", f"{len(risk_df[risk_df['Risk_Score'] > 0.6])}", help="Districts with Risk Score > 0.6")
+
+    st.markdown("---")
+    
+    col_main, col_detail = st.columns([2, 1])
+    
+    with col_main:
+        # Scatter Plot Analysis
+        st.subheader("Anomaly Detection Grid")
+        st.markdown("Districts in the **Top-Right** (High Adult Ratio + High Surge) are primary suspects.")
+        
+        from src.plots import plot_scatter
+        # Custom scatter with color gradient based on Risk
+        fig_anom = px.scatter(risk_df, x="Adult_Influx_Index", y="Peak_Daily_Surge",
+                              color="Risk_Score", size="Total_Enrolments",
+                              hover_data=['district', 'age_18_greater', 'Child_Enrolments'],
+                              color_continuous_scale="RdYlR_r",
+                              title="Risk Profile: Influx Intensity vs Volume",
+                              labels={"Adult_Influx_Index": "Adult Influx Index (Ratio)", "Peak_Daily_Surge": "Max Daily Enrolments"})
+        
+        # Add thresholds
+        fig_anom.add_vline(x=avg_adult_ratio * 1.5, line_dash="dash", line_color="orange", annotation_text="High Adult Ratio")
+        st.plotly_chart(fig_anom, use_container_width=True)
+        
+    with col_detail:
+        st.subheader("🚨 Suspect Leaderboard")
+        st.dataframe(risk_df[['district', 'Risk_Score', 'Adult_Influx_Index', 'Total_Enrolments']]
+                     .head(15)
+                     .style.background_gradient(subset=['Risk_Score'], cmap='Reds')
+                     .format({'Risk_Score': '{:.2%}', 'Adult_Influx_Index': '{:.2f}'}))
+
+    # --- 3. Deep Dive ---
+    st.markdown("---")
+    st.subheader("district-Level Forensic Deep Dive")
+    
+    inspect_dist = st.selectbox("Select District to Investigate", risk_df['district'].head(20).tolist())
+    
+    if inspect_dist:
+        d_data = working_df[working_df['district'] == inspect_dist]
+        
+        # Daily Trend for this district
+        d_trend = d_data.groupby('date')[['age_0_5', 'age_5_17', 'age_18_greater']].sum().reset_index()
+        d_trend_melt = d_trend.melt(id_vars='date', var_name='Age Group', value_name='Count')
+        
+        title_txt = f"Daily Enrollment Pattern: {inspect_dist}"
+        fig_inve = px.line(d_trend_melt, x='date', y='Count', color='Age Group', title=title_txt, markers=True)
+        
+        # Highlight adult spikes
+        st.plotly_chart(fig_inve, use_container_width=True)
+        
+        # Composition
+        d_total = d_data[['age_0_5', 'age_5_17', 'age_18_greater']].sum().reset_index()
+        d_total.columns = ['Age Group', 'Count']
+        
+        c1, c2 = st.columns(2)
+        c1.plotly_chart(px.pie(d_total, names='Age Group', values='Count', title=f"Age Composition: {inspect_dist}", hole=0.4), use_container_width=True)
+        
+        with c2:
+            st.warning(f"**Forensic Note**: Investigating {inspect_dist}")
+            curr_aii = risk_df[risk_df['district'] == inspect_dist]['Adult_Influx_Index'].values[0]
+            
+            if curr_aii > avg_adult_ratio * 2:
+                st.error(f"⚠️ **Abnormal Adult Influx**: AII is {curr_aii:.2f} ({(curr_aii/avg_adult_ratio):.1f}x state avg). Strong indicator of non-birth based enrollment.")
+            else:
+                st.info(f"ℹ️ **Moderate Profile**: AII is {curr_aii:.2f}. Within normal variance, check specific dates for spikes.")
+                
+
 
